@@ -1,6 +1,7 @@
 """Module for Command Line Interface"""
 
 import argparse
+from os.path import splitext
 
 import matplotlib.image as img
 
@@ -18,12 +19,11 @@ def main():
     parser.add_argument(
         '-p', '--path',
         default='.',
-        help='path to dir for saving result image (default = current dir)',
+        help='path to dir to save compression result [default: current dir]',
     )
     parser.add_argument(
         '-n', '--name',
-        default='compressed',
-        help='name of the file for saving (default = compressed)',
+        help='name of the file to save compression result [default: [filename]-comp]',
     )
     parser.add_argument(
         '-b', '--bounds',
@@ -33,35 +33,53 @@ def main():
     )
     parser.add_argument(
         '-f', '--format',
-        choices=['png', 'gif'],
-        default='png',
-        help='format in which to save result file (default = png)'
+        choices=['img', 'anim'],
+        default='img',
+        help='format in which to save result file [default: img]'
     )
     parser.add_argument(
         '-r', '--ratio',
-        type=int, default=-1,
-        help='the higher the value, the lower the compression ratio (default = min compression)'
+        type=int, default=0,
+        help='the higher the value, the lower the compression ratio [default: 0]'
     )
 
     args = parser.parse_args()
 
+    name = args.name
+    if (not name):
+        name = splitext(args.filename)[0] + '-comp'
+
     print('Compression started!')
-    compress(args.filename, args.path, args.name, args.boundaries, args.format, args.ratio)
+    compress(
+        args.filename,
+        args.path,
+        name,
+        args.ratio,
+        args.format,
+        args.boundaries,
+    )
     print('Compression finished!')
 
 
-def compress(filename, path, name, boundaries, format, ratio):
+def compress(
+    filename: str,
+    path: str,
+    name: str,
+    ratio: int,
+    format: str,
+    boundaries: bool,
+):
     image = img.imread(filename)
 
     qtree = time_func(ImageQuadTree, False)(image)
-    
+
     if (ratio < 0 or ratio > qtree.leaf_level):
         ratio = qtree.leaf_level
 
-    if (format == 'png'):
-        qtree.save_image(ratio, boundaries, name, path)
+    if (format == 'img'):
+        qtree.save_image(ratio, path, name, boundaries)
     else:
-        qtree.save_gif(ratio, boundaries, name, path)
+        qtree.save_animation(ratio, path, name, boundaries)
 
 
 if __name__ == '__main__':
