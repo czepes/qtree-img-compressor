@@ -1,8 +1,10 @@
 """Module for utility functions"""
 
 from time import perf_counter
+from typing import Any, Callable
 
-def fn_to_str(fn, *args, **kwargs):
+
+def fn_to_str(fn: Callable, *args: Any, **kwargs: Any):
     sep = ', ' if args and kwargs else ''
 
     return fn.__name__ + \
@@ -11,10 +13,10 @@ def fn_to_str(fn, *args, **kwargs):
         ', '.join([f'{k} = {v}' for k, v in kwargs.items()]) + ')'
 
 
-def time_func(fn, print_args=True):
-    def wrapper(*args, **kwargs):
+def time_func(fn: Callable, print_args: bool = True):
+    def wrapper(*args: Any, **kwargs: Any):
         start = perf_counter()
-        
+
         result = fn(*args, **kwargs)
 
         exec_time = perf_counter() - start

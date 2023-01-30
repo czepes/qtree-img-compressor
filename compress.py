@@ -1,21 +1,20 @@
 """Module with functions and classes for image compression"""
 
 from __future__ import annotations
-
+import os
 import shutil
+
+from pathlib import Path
+from operator import add
+from functools import reduce
+from typing import Literal
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.image as img
 import numpy as np
 
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from PIL import Image
-
-from pathlib import Path
-
-from operator import add
-from functools import reduce
 
 from util import time_func
 
@@ -33,21 +32,11 @@ def quad_concat(tl: np.ndarray, tr: np.ndarray, bl: np.ndarray, br: np.ndarray):
 
 
 def calc_mean_color(image: np.ndarray):
-    return np.mean(image, axis=(0, 1))
+    return np.mean(image, axis=(0, 1)).astype(int)
 
 
-def calc_mean_color_split(split_image: np.ndarray):
-    return np.array(list(map(
-        lambda x: calc_mean_color(x), split_image)
-    )).astype(int)
-
-
-def is_equal(my_list):
-    return all((x == my_list[0]).all() for x in my_list)
-
-
-def color_is_equal(image, colors):
-    return all((x == colors[0]).all() for x in calc_mean_color_split(image))
+def is_one_color(image: np.ndarray):
+    return all((pixel == image[0]).all() for pixel in image)
 
 
 class Rectangle:
@@ -88,7 +77,6 @@ class ImageQuadTree:
         image: np.ndarray,
         level: int = 0,
         rect: Rectangle = None,
-        color_type: type = None,
         root: ImageQuadTree = None
     ):
         if rect is None:
@@ -97,9 +85,7 @@ class ImageQuadTree:
         self.rect = rect
         self.level = level
 
-        if not color_type:
-            color_type = type(image[0][0][0].item())
-        self.mean_color = calc_mean_color(image).astype(color_type)
+        self.mean_color = calc_mean_color(image)
 
         self.resolution = (image.shape[1], image.shape[0])
         self.leaf = True
@@ -107,17 +93,20 @@ class ImageQuadTree:
         if root is None:
             self.leaf_level = -1
             root = self
+
+        self.root = root
+
         if root.leaf_level < level:
             root.leaf_level = level
 
-        if not is_equal(image):
+        if not is_one_color(image):
             split_img = quad_split(image)
             self.leaf = False
 
             left = rect.get_left()
             top = rect.get_top()
 
-            arguments = [
+            branches_args = [
                 [
                     split_img[0],
                     level + 1,
@@ -125,7 +114,6 @@ class ImageQuadTree:
                               top,
                               split_img[0].shape[1],
                               split_img[0].shape[0]),
-                    color_type,
                     root
                 ],
                 [
@@ -135,7 +123,6 @@ class ImageQuadTree:
                               top,
                               split_img[1].shape[1],
                               split_img[1].shape[0]),
-                    color_type,
                     root
                 ],
                 [
@@ -145,7 +132,6 @@ class ImageQuadTree:
                               top + split_img[0].shape[0],
                               split_img[2].shape[1],
                               split_img[2].shape[0]),
-                    color_type,
                     root
                 ],
                 [
@@ -155,24 +141,14 @@ class ImageQuadTree:
                               top + split_img[1].shape[0],
                               split_img[3].shape[1],
                               split_img[3].shape[0]),
-                    color_type,
                     root
                 ]
             ]
 
-            # if level == 0:
-            #     with ProcessPoolExecutor() as executor:
-            #         futures = [executor.submit(ImageQuadTree, *args)
-            #                    for args in arguments]
-            #         self.top_left = futures[0].result()
-            #         self.top_right = futures[1].result()
-            #         self.bottom_left = futures[2].result()
-            #         self.bottom_right = futures[3].result()
-            # else:
-            self.top_left = ImageQuadTree(*arguments[0])
-            self.top_right = ImageQuadTree(*arguments[1])
-            self.bottom_left = ImageQuadTree(*arguments[2])
-            self.bottom_right = ImageQuadTree(*arguments[3])
+            self.top_left = ImageQuadTree(*branches_args[0])
+            self.top_right = ImageQuadTree(*branches_args[1])
+            self.bottom_left = ImageQuadTree(*branches_args[2])
+            self.bottom_right = ImageQuadTree(*branches_args[3])
 
     def get_square(self, level: int, boundaries: bool = False):
         if self.leaf or self.level == level:
@@ -180,7 +156,6 @@ class ImageQuadTree:
             width = self.rect.get_width()
 
             square = np.tile(self.mean_color, (
-            # ? Width -> height or height -> width?
                 height,
                 width,
                 1
@@ -199,14 +174,15 @@ class ImageQuadTree:
             self.bottom_right.get_square(level, boundaries)
         )
 
-    @time_func
     def save_image(
         self,
         level: int,
-        path: str = '.',
+        path: str | Path = '.',
         name: str = 'compressed',
         boundaries: bool = False,
     ):
+        level = self.check_level(level)
+
         fig = plt.figure()
         plt.axis('off')
         fig.axes[0].get_xaxis().set_visible(False)
@@ -219,30 +195,29 @@ class ImageQuadTree:
 
         ax.imshow(self.get_square(level, boundaries), aspect='equal')
 
-        plt.savefig(Path(f'{path}/{name}.png'))
+        plt.savefig(Path(path, f'{name}.png'))
 
-    @time_func
     def save_animation(
         self,
         level: int,
-        path: str = '.',
+        path: str | Path = '.',
         name: str = 'compressed',
         boundaries: bool = False,
     ):
-        Path(f'tmp').mkdir(parents=True, exist_ok=True)
+        level = self.check_level(level)
 
-        img_range = range(self.leaf_level, level - 1, -1)
+        frames_path = Path(os.path.dirname(__file__), '__tmp__')
+        frames_path.mkdir(parents=True, exist_ok=True)
 
-        for i in img_range:
-            self.save_image(i, 'tmp', i, boundaries)
-
+        level_range = range(self.leaf_level, level - 1, -1)
         frames = []
 
-        for i in img_range:
-            frames.append(Image.open(f'tmp/{i}.png'))
+        for i in level_range:
+            self.save_image(i, frames_path, i, boundaries)
+            frames.append(Image.open(Path(frames_path, f'{i}.png')))
 
         frames[0].save(
-            Path(f'{path}/{name}.gif'),
+            Path(path, f'{name}.gif'),
             save_all=True,
             append_images=frames[1:],
             optimize=True,
@@ -250,4 +225,32 @@ class ImageQuadTree:
             loop=0
         )
 
-        shutil.rmtree('tmp')
+        shutil.rmtree(frames_path)
+
+    def check_level(self, level: int):
+        if (level < 0):
+            return 0
+        if (level > self.root.leaf_level):
+            return self.root.leaf_level
+        return level
+
+
+def compress(
+    filename: str | Path,
+    path: str | Path = '.',
+    name: str = 'compressed',
+    ratio: int = 0,
+    format: Literal['img', 'anim'] = 'img',
+    boundaries: bool = False,
+):
+    image = img.imread(filename)
+
+    qtree = time_func(ImageQuadTree, False)(image)
+
+    if (ratio < 0 or ratio > qtree.leaf_level):
+        ratio = qtree.leaf_level
+
+    if (format == 'img'):
+        time_func(qtree.save_image, False)(ratio, path, name, boundaries)
+    else:
+        time_func(qtree.save_animation, False)(ratio, path, name, boundaries)

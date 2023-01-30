@@ -1,3 +1,5 @@
 __pycache__
+__tmp__
 *.png
+*.jpg
 *.gif
