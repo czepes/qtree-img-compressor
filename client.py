@@ -7,6 +7,9 @@ from compress import compress
 
 
 def main():
+    """
+    Run CLI
+    """
     parser = argparse.ArgumentParser(
         prog='QTreeImageCompressor',
         description='Program compresses images with QuadTree recursive abstraction',
@@ -43,7 +46,7 @@ def main():
     args = parser.parse_args()
 
     name = args.name
-    if (not name):
+    if not name:
         name = os.path.splitext(
             os.path.basename(args.file)
         )[0] + '-comp'
