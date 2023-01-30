@@ -1,19 +1,18 @@
 """Module with functions and classes for image compression"""
 
 from __future__ import annotations
-import os
-import shutil
-
-from pathlib import Path
-from operator import add
+from concurrent.futures import ThreadPoolExecutor
 from functools import reduce
+from operator import add
+import os
+from pathlib import Path
+import shutil
 from typing import Literal
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.image as img
 import numpy as np
-
 from PIL import Image
 
 from util import time_func
@@ -145,10 +144,19 @@ class ImageQuadTree:
                 ]
             ]
 
-            self.top_left = ImageQuadTree(*branches_args[0])
-            self.top_right = ImageQuadTree(*branches_args[1])
-            self.bottom_left = ImageQuadTree(*branches_args[2])
-            self.bottom_right = ImageQuadTree(*branches_args[3])
+            if level == 0:
+                with ThreadPoolExecutor() as executor:
+                    futures = [executor.submit(ImageQuadTree, *args)
+                               for args in branches_args]
+                    self.top_left = futures[0].result()
+                    self.top_right = futures[1].result()
+                    self.bottom_left = futures[2].result()
+                    self.bottom_right = futures[3].result()
+            else:
+                self.top_left = ImageQuadTree(*branches_args[0])
+                self.top_right = ImageQuadTree(*branches_args[1])
+                self.bottom_left = ImageQuadTree(*branches_args[2])
+                self.bottom_right = ImageQuadTree(*branches_args[3])
 
     def get_square(self, level: int, boundaries: bool = False):
         if self.leaf or self.level == level:
