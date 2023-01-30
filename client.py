@@ -1,4 +1,4 @@
-"""Module for Command Line Interface"""
+"""Module of Command Line Interface functions"""
 
 import argparse
 import os.path

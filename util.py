@@ -1,10 +1,18 @@
-"""Module for utility functions"""
+"""Module of utility functions"""
 
 from time import perf_counter
 from typing import Any, Callable
 
 
-def fn_to_str(fn: Callable, *args: Any, **kwargs: Any):
+def fn_to_str(fn: Callable, *args: Any, **kwargs: Any) -> str:
+    """Represent function as a string.
+
+    Args:
+        fn (Callable): Function.
+
+    Returns:
+        str: Function string representation.
+    """
     sep = ', ' if args and kwargs else ''
 
     return fn.__name__ + \
@@ -13,8 +21,22 @@ def fn_to_str(fn: Callable, *args: Any, **kwargs: Any):
         ', '.join([f'{k} = {v}' for k, v in kwargs.items()]) + ')'
 
 
-def time_func(fn: Callable, print_args: bool = True):
-    def wrapper(*args: Any, **kwargs: Any):
+def time_func(fn: Callable, print_args: bool = True) -> Callable:
+    """Decorate function to display its execution time.
+
+    Args:
+        fn (Callable): Function.
+        print_args (bool, optional): Flag to print function call arguments. Defaults to True.
+
+    Returns:
+        Callable: Time measuring wrapper function.
+    """    
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        """Time measuring wrapper function.
+
+        Returns:
+            Any: Function return value.
+        """        
         start = perf_counter()
 
         result = fn(*args, **kwargs)
