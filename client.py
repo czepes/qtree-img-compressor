@@ -2,6 +2,7 @@
 
 import argparse
 import os.path
+from pathlib import Path
 
 from compress import compress
 
@@ -51,14 +52,15 @@ def main():
             os.path.basename(args.file)
         )[0] + '-comp'
 
+    pathname = Path(args.path, name)
+
     print('Compression started!')
     compress(
         args.file,
-        args.path,
-        name,
         args.ratio,
-        args.format,
         args.boundaries,
+        pathname,
+        args.format,
     )
     print('Compression finished!')
 

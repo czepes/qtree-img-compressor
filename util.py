@@ -22,7 +22,7 @@ def func_to_str(func: Callable, *args: Any, **kwargs: Any) -> str:
         ', '.join([f'{k} = {v}' for k, v in kwargs.items()]) + ')'
 
 
-def time_func(func: Callable, print_args: bool = True) -> Callable:
+def time_func(func: Callable, print_args: bool = False) -> Callable:
     """
     Decorate function to display its execution time.
 
